@@ -31,9 +31,19 @@ return {
           'rafamadriz/friendly-snippets',
         },
       },
+      {
+        "zbirenbaum/copilot-cmp",
+        opts = {},
+        dependencies = {
+          "zbirenbaum/copilot.lua",
+          cmd = "Copilot",
+          event = "InsertEnter",
+          opts = {}
+        }
+      }
     },
     config = function ()
-     require('config.lsp') 
+      require('config.lsp')
     end
   },
 
