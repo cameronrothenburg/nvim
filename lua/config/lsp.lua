@@ -68,6 +68,9 @@ mason_lspconfig.setup_handlers {
     require('lspconfig')[server_name].setup {
       capabilities = capabilities,
       on_attach = on_attach,
+      on_init = function(client)
+        client.server_capabilities.documentFormattingProvider = false
+      end,
       settings = servers[server_name],
       filetypes = (servers[server_name] or {}).filetypes,
     }
