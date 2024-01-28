@@ -16,6 +16,9 @@ return {
         cond = function()
           return vim.fn.executable 'make' == 1
         end,
+        config = function ()
+         require('config.telescope') 
+        end
       },
     },
   },
