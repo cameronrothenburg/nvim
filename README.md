@@ -2,4 +2,4 @@
 
 ## Installation
 
-`git clone https://github.com/cameronrothenburg/vim.git ~/.config/nvim`
+`git clone https://github.com/cameronrothenburg/nvim.git ~/.config/nvim`
