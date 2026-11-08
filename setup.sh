@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Ubuntu/Debian install or update. Never resets or deletes an existing config.
 set -euo pipefail
-NVIM_VERSION="v0.12.6"
 REPO_URL="https://github.com/cameronrothenburg/nvim.git"
 CONFIG_DIR="${NVIM_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nvim}"
 BIN_DIR="$HOME/.local/bin"
@@ -16,7 +15,7 @@ command -v apt-get >/dev/null || die "This installer requires Ubuntu/Debian (apt
 SUDO=()
 if [[ "$EUID" -ne 0 ]]; then SUDO=(sudo); fi
 "${SUDO[@]}" apt-get update
-"${SUDO[@]}" apt-get install -y git curl ca-certificates tar xz-utils unzip build-essential ripgrep fd-find
+"${SUDO[@]}" apt-get install -y git curl ca-certificates tar xz-utils unzip build-essential ripgrep fd-find fzf python3
 
 # Refuse to overwrite unrelated checkouts or local work.
 if [[ -e "$CONFIG_DIR" ]]; then
@@ -37,6 +36,11 @@ fi
 mkdir -p "$BIN_DIR"
 stage=$(mktemp -d)
 trap 'rm -rf -- "$stage"' EXIT
+# Resolve GitHub's stable release at install time; never select nightly builds.
+curl -fsSL --retry 3 https://api.github.com/repos/neovim/neovim/releases/latest -o "$stage/neovim-release.json"
+NVIM_VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$stage/neovim-release.json")
+[[ "$NVIM_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Invalid stable Neovim release: $NVIM_VERSION"
+printf 'Installing latest stable Neovim: %s\n' "$NVIM_VERSION"
 archive="nvim-linux-${NVIM_ARCH}"
 install_dir="$HOME/.local/lib/nvim-${NVIM_VERSION}-${NVIM_ARCH}"
 if [[ ! -x "$install_dir/bin/nvim" ]]; then
@@ -74,6 +78,18 @@ if [[ "${SHELL:-}" == */zsh ]]; then
   grep -Fxq "$path_line" "$HOME/.zshrc" || printf '\n%s\n' "$path_line" >> "$HOME/.zshrc"
 fi
 npm ci --prefix "$CONFIG_DIR/tools" --no-fund --no-audit
+# Standalone CLI, as required by nvim-treesitter (not its npm distribution).
+curl -fsSL --retry 3 https://api.github.com/repos/tree-sitter/tree-sitter/releases/latest -o "$stage/treesitter-release.json"
+TS_VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$stage/treesitter-release.json")
+[[ "$TS_VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Invalid Tree-sitter release: $TS_VERSION"
+curl -fL --retry 3 "https://github.com/tree-sitter/tree-sitter/releases/download/$TS_VERSION/tree-sitter-linux-$NODE_ARCH.gz" -o "$stage/tree-sitter.gz"
+gzip -dc "$stage/tree-sitter.gz" > "$stage/tree-sitter"
+chmod +x "$stage/tree-sitter"
+mv "$stage/tree-sitter" "$BIN_DIR/tree-sitter"
+ln -sfn "$CONFIG_DIR/tools/node_modules/.bin/codex-acp" "$BIN_DIR/codex-acp"
+for tool in nvim node npm git rg fd fzf tree-sitter codex-acp cc; do
+  command -v "$tool" >/dev/null || die "Required command missing from PATH: $tool"
+done
 if [[ "${NVIM_SKIP_SYNC:-0}" != 1 ]]; then
   XDG_CONFIG_HOME="$(dirname "$CONFIG_DIR")" NVIM_APPNAME="$(basename "$CONFIG_DIR")" \
     "$BIN_DIR/nvim" --headless '+Lazy! restore' +qa

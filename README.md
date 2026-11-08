@@ -10,7 +10,7 @@ Run this in a regular user account, not a root shell:
 curl -fsSL https://raw.githubusercontent.com/cameronrothenburg/nvim/master/setup.sh -o /tmp/cameron-nvim-setup.sh && bash /tmp/cameron-nvim-setup.sh
 ```
 
-Installs system dependencies through apt, Neovim **0.12.6** under `~/.local`, Node 24 LTS if your Node is older than 22, the config at `~/.config/nvim` (or `$XDG_CONFIG_HOME/nvim`), and the pinned Codex bridge. Supports Linux x86_64 and arm64. Restores plugins from the lockfile. Restart your shell afterwards.
+Checks GitHub for the **latest stable Neovim** on every run and installs it under `~/.local`. Installs Git, curl, a C/C++ compiler, ripgrep, fd, fzf, Python, archive tools, a standalone Tree-sitter CLI, Node 24 LTS if your Node is older than 22, the config at `~/.config/nvim` (or `$XDG_CONFIG_HOME/nvim`), and the pinned Codex bridge. Supports Linux x86_64 and arm64. Restores plugins from the lockfile. Adds `~/.local/bin` to your shell PATH, including `nvim`, `tree-sitter` and `codex-acp`. Restart your shell afterwards.
 
 Use a Nerd Font in your terminal for LazyVim's icons. Project-specific compilers and SDKs (Rust, Go, game engines, etc.) are separate from this editor setup.
 
@@ -22,9 +22,9 @@ Run in PowerShell:
 Invoke-WebRequest https://raw.githubusercontent.com/cameronrothenburg/nvim/master/setup.ps1 -OutFile "$env:TEMP\cameron-nvim-setup.ps1"; powershell -NoProfile -ExecutionPolicy Bypass -File "$env:TEMP\cameron-nvim-setup.ps1"
 ```
 
-Uses your installed Neovim if it is 0.12+, otherwise downloads 0.12.6. Uses winget for missing Git, Node LTS, ripgrep and fd. Requires Node 22+; an older existing Node must be upgraded. Config lives at `%LOCALAPPDATA%\nvim`. Adds Neovim to your user PATH. Restart your terminal afterwards. Tree-sitter parser builds on Windows also need a C compiler; Ubuntu's installer includes one.
+Checks GitHub for the **latest stable Neovim** on every run. Reuses an exact matching installation or downloads that release. An older standard Program Files installation is upgraded through winget to prevent it shadowing the new executable (Windows may request elevation). Uses winget for missing Git, Node LTS, ripgrep, fd, fzf and the standalone Tree-sitter CLI; installs WinLibs GCC if no GCC, Clang or MSVC compiler is available. Requires Node 22+; an older existing Node must be upgraded. Config lives at `%LOCALAPPDATA%\nvim`. Persists executable directories, including `nvim` and `codex-acp`, in your user PATH and updates the current process PATH. Restart your terminal afterwards. Windows compiler fallback targets x64; ARM64 users need a compatible C compiler already installed.
 
-Both installers refuse to overwrite unrelated configs or discard uncommitted changes. An existing clean checkout is updated with `git pull --ff-only`. An existing config from elsewhere must be moved aside manually first.
+Both installers check that required commands resolve on PATH and refuse to overwrite unrelated configs or discard uncommitted changes. An existing clean checkout is updated with `git pull --ff-only`. An existing config from elsewhere must be moved aside manually first. Neovim tracks stable releases; plugins and the Codex bridge remain locked for repeatability.
 
 ## Sign in to Codex
 

@@ -26,6 +26,13 @@ function Ensure-Tool {
     }
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) { throw "Restart your terminal after installing $Package, then retry." }
 }
+function Add-UserPath {
+    param([string]$Directory)
+    $entries = @([Environment]::GetEnvironmentVariable('Path', 'User') -split ';' |
+        Where-Object { $_ -and $_.TrimEnd('\') -ne $Directory.TrimEnd('\') })
+    [Environment]::SetEnvironmentVariable('Path', (@($Directory) + $entries -join ';'), 'User')
+    $env:Path = "$Directory;$env:Path"
+}
 
 Ensure-Tool git.exe Git.Git
 $ConfigDir = [IO.Path]::GetFullPath($ConfigDir)
@@ -55,34 +62,58 @@ $nodeMajor = [int](& node.exe -p 'process.versions.node.split(".")[0]')
 if ($nodeMajor -lt 22) { throw 'Node.js 22+ is required. Upgrade Node.js LTS, then run setup again.' }
 Ensure-Tool rg.exe BurntSushi.ripgrep.MSVC
 Ensure-Tool fd.exe sharkdp.fd
+Ensure-Tool fzf.exe junegunn.fzf
+Ensure-Tool tree-sitter.exe tree-sitter.tree-sitter-cli
+if (-not (Get-Command gcc.exe, clang.exe, cl.exe -ErrorAction SilentlyContinue)) {
+    if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'Install a native ARM64 C compiler before running setup.' }
+    Ensure-Tool gcc.exe BrechtSanders.WinLibs.POSIX.UCRT
+}
 
 Refresh-Path
+$release = Invoke-RestMethod -Uri 'https://api.github.com/repos/neovim/neovim/releases/latest'
+$latestVersion = $release.tag_name
+if ($latestVersion -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid stable Neovim release: $latestVersion" }
+Write-Host "Installing latest stable Neovim: $latestVersion"
 $nvimCommand = Get-Command nvim.exe -ErrorAction SilentlyContinue
 $nvimExe = if ($nvimCommand) { $nvimCommand.Source } else { Join-Path $env:ProgramFiles 'Neovim\bin\nvim.exe' }
 $supported = $false
 if (Test-Path -LiteralPath $nvimExe) {
     $version = (& $nvimExe --version | Select-Object -First 1)
-    if ($version -match 'NVIM v(\d+)\.(\d+)') { $supported = ([int]$Matches[1] -gt 0 -or [int]$Matches[2] -ge 12) }
+    $supported = $version -eq "NVIM $latestVersion"
+    # A machine PATH entry precedes user PATH in new terminals. Upgrade the
+    # standard system install so it cannot shadow a newer per-user copy.
+    $systemInstall = Join-Path $env:ProgramFiles 'Neovim\bin\nvim.exe'
+    if (-not $supported -and $nvimExe -eq $systemInstall) {
+        Invoke-Checked winget.exe @('install', '--id', 'Neovim.Neovim', '--exact', '--version', $latestVersion.TrimStart('v'), '--source', 'winget', '--force', '--accept-package-agreements', '--accept-source-agreements')
+        $supported = ((& $nvimExe --version | Select-Object -First 1) -eq "NVIM $latestVersion")
+        if (-not $supported) { throw "The system Neovim install could not be upgraded to $latestVersion." }
+    }
 }
 if (-not $supported) {
     $archiveName = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'nvim-win-arm64' } else { 'nvim-win64' }
-    $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\CameronNvim\v0.12.6'
+    $installRoot = Join-Path $env:LOCALAPPDATA "Programs\CameronNvim\$latestVersion"
     $nvimExe = Join-Path $installRoot "$archiveName\bin\nvim.exe"
     if (-not (Test-Path -LiteralPath $nvimExe)) {
         New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
         $zipPath = Join-Path $installRoot "$archiveName.zip"
-        Invoke-WebRequest -Uri "https://github.com/neovim/neovim/releases/download/v0.12.6/$archiveName.zip" -OutFile $zipPath
+        Invoke-WebRequest -Uri "https://github.com/neovim/neovim/releases/download/$latestVersion/$archiveName.zip" -OutFile $zipPath
         Expand-Archive -LiteralPath $zipPath -DestinationPath $installRoot -Force
         Remove-Item -LiteralPath $zipPath
     }
 }
 $nvimBin = Split-Path $nvimExe
-$userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-if (($userPath -split ';') -notcontains $nvimBin) {
-    [Environment]::SetEnvironmentVariable('Path', "$nvimBin;$userPath", 'User')
-}
-$env:Path = "$nvimBin;$env:Path"
+Add-UserPath $nvimBin
 Invoke-Checked npm.cmd @('ci', '--prefix', (Join-Path $ConfigDir 'tools'), '--no-fund', '--no-audit')
+Add-UserPath (Join-Path $ConfigDir 'tools\node_modules\.bin')
+foreach ($tool in @('nvim.exe', 'node.exe', 'npm.cmd', 'git.exe', 'curl.exe', 'tar.exe', 'rg.exe', 'fd.exe', 'fzf.exe', 'tree-sitter.exe', 'codex-acp.cmd')) {
+    $resolved = Get-Command $tool -ErrorAction SilentlyContinue
+    if (-not $resolved) { throw "Required command missing from PATH: $tool" }
+    Add-UserPath (Split-Path $resolved.Source)
+}
+$compiler = Get-Command gcc.exe, clang.exe, cl.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+Add-UserPath (Split-Path $compiler.Source)
+# Keep the chosen Neovim ahead of other user-level installations.
+Add-UserPath $nvimBin
 if (-not $SkipPlugins) {
     # The normal install uses stdpath(config). Custom paths are for isolated testing.
     $previousXdg = $env:XDG_CONFIG_HOME
