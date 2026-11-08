@@ -1,0 +1,8 @@
+{
+  "name": "cameron-nvim-tools",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned Codex bridge for CodeCompanion; credentials stay outside this repo",
+  "engines": { "node": ">=22" },
+  "dependencies": { "@agentclientprotocol/codex-acp": "2.6.0" }
+}

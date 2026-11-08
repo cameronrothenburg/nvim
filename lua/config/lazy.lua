@@ -1,5 +1,14 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 
+-- Some plugin test filenames exceed Windows' legacy path limit. Keep this
+-- setting local to Neovim's Git subprocesses, not the user's global Git config.
+if vim.fn.has("win32") == 1 then
+  local count = tonumber(vim.env.GIT_CONFIG_COUNT) or 0
+  vim.env["GIT_CONFIG_KEY_" .. count] = "core.longpaths"
+  vim.env["GIT_CONFIG_VALUE_" .. count] = "true"
+  vim.env.GIT_CONFIG_COUNT = tostring(count + 1)
+end
+
 if not (vim.uv or vim.loop).fs_stat(lazypath) then
   -- bootstrap lazy.nvim
   -- stylua: ignore
